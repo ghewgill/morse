@@ -1,2 +1,7 @@
+all: morse.exe koch.exe
+
 morse.exe: morse.cpp
 	cl morse.cpp winmm.lib
+
+koch.exe: koch.cpp
+	cl koch.cpp
