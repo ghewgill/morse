@@ -38,7 +38,8 @@
 const char Letters[] = "KMRSUAPTLOWI.NJEF0Y,VG5/Q9ZH38B?427C1D6X<BT><SK><AR>";
 const int WMAX = 10;
 
-int WPM = 15;
+int WPM_chars = 20;
+int WPM_total = 15;
 int Level = 2;
 
 double urand()
@@ -63,7 +64,7 @@ Morse::Morse(const char *text)
 {
 #ifdef _WIN32
     char cmd[1000];
-    snprintf(cmd, sizeof(cmd), BIN_MORSE" -c20 -w%d %s", WPM, text);
+    snprintf(cmd, sizeof(cmd), BIN_MORSE" -c%d -w%d %s", WPM_chars, WPM_total, text);
     STARTUPINFO si;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
@@ -77,9 +78,11 @@ Morse::Morse(const char *text)
 #else
     process = fork();
     if (process == 0) {
-        char wpm[10];
-        snprintf(wpm, sizeof(wpm), "-w%d\n", WPM);
-        execl(BIN_MORSE, BIN_MORSE, "-c20", wpm, text, NULL);
+        char wpm_chars[10];
+        snprintf(wpm_chars, sizeof(wpm_chars), "-w%d\n", WPM_chars);
+        char wpm_total[10];
+        snprintf(wpm_total, sizeof(wpm_total), "-w%d\n", WPM_total);
+        execl(BIN_MORSE, BIN_MORSE, wpm_chars, wpm_total, text, NULL);
         fprintf(stderr, "execl failed: %d\n", errno);
         exit(127);
     }
@@ -134,8 +137,36 @@ int match(const char *good, const char *test)
 
 int main(int argc, char *argv[])
 {
-    if (argc >= 2) {
-        Level = atoi(argv[1]);
+    int a = 1;
+    while (a < argc && argv[a][0] == '-') {
+        switch (argv[a][1]) {
+        case 'c':
+            if (argv[a][2]) {
+                WPM_chars = atoi(argv[a]+2);
+            } else {
+                a++;
+                WPM_chars = atoi(argv[a]);
+            }
+            break;
+        case 'w':
+            if (argv[a][2]) {
+                WPM_total = atoi(argv[a]+2);
+            } else {
+                a++;
+                WPM_total = atoi(argv[a]);
+            }
+            break;
+        default:
+            fprintf(stderr, "%s: invalid option %s\n", argv[0], argv[a]);
+            exit(1);
+        }
+        a++;
+    }
+    if (WPM_chars < WPM_total) {
+        WPM_total = WPM_chars;
+    }
+    if (a < argc) {
+        Level = atoi(argv[a]);
     }
     srand(time(0));
     for (;;) {
@@ -146,7 +177,7 @@ int main(int argc, char *argv[])
         }
         char words[1000];
         words[0] = 0;
-        for (int i = 0; i < WPM*5; i++) {
+        for (int i = 0; i < WPM_total*5; i++) {
             int len = static_cast<int>(urand()*5+2); //5*(1/-log(urand()));
             char word[WMAX];
             for (int j = 0; j < len; j++) {
