@@ -24,6 +24,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#define for if(0);else for
 #endif
 
 #ifndef M_PI
@@ -358,7 +359,10 @@ int main(int argc, char *argv[])
         }
         a++;
     }
-    if (WPM_chars == 0 || WPM_total == 0 || WPM_total > WPM_chars) {
+    if (WPM_total > WPM_chars) {
+        WPM_chars = WPM_total;
+    }
+    if (WPM_chars == 0 || WPM_total == 0) {
         fprintf(stderr, "%s: Invalid wpm parameter\n", argv[0]);
         exit(1);
     }
