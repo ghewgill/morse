@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
     if (argc >= 2) {
         Level = atoi(argv[1]);
     }
+    srand(time(0));
     int lastminute = 0;
     int total = 0;
     int correct = 0;
@@ -60,7 +61,9 @@ int main(int argc, char *argv[])
         if (fgets(user, sizeof(user), stdin) == NULL) {
             break;
         }
-        if (user[0] == '*') {
+        if (user[0] == '\n') {
+            continue;
+        } else if (user[0] == '*') {
             printf("(reset)\n");
             total = 0;
             correct = 0;
