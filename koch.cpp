@@ -37,7 +37,7 @@
 const char Letters[] = "KMRSUAPTLOWI.NJEF0Y,VG5/Q9ZH38B?427C1D6X<BT><SK><AR>";
 const int WMAX = 10;
 
-int WPM = 10;
+int WPM = 15;
 int Level = 2;
 
 double urand()
