@@ -190,10 +190,14 @@ int main(int argc, char *argv[])
         //printf("words: %s\n", words);
         sleep(1);
         Morse morse(words);
+        time_t start = time(0);
         char user[1000];
         if (fgets(user, sizeof(user), stdin) == NULL) {
             break;
         }
+        time_t end = time(0);
+        printf("%s\n", words);
+        printf("%d seconds\n", end-start);
         int score = match(words, user);
         printf("%d%%\n", score);
         if (score >= 90) {
