@@ -29,9 +29,11 @@
 double M_PI = 4*atan(1);
 #endif
 
-const int WPM_chars = 10;
-const int WPM_total = 5;
-const int FREQ = 500;
+int WPM_chars = 5;
+int WPM_total = 5;
+int Freq = 500;
+bool Verbose = false;
+bool Echo = false;
 
 int SPC_chars;
 int SPC_total;
@@ -279,8 +281,77 @@ void tone(int w)
     pcm->output(buf_silent, SPC_chars);
 }
 
+void morse(const char *word)
+{
+    for (const char *p = word; *p != 0; p++) {
+        if (*p == ' ') {
+            pause(7);
+        } else {
+            const char *cw = getcode(toupper(*p));
+            if (cw != NULL) {
+                for (const char *c = cw; *c != 0; c++) {
+                    if (*c == '.') {
+                        tone(1);
+                    } else {
+                        tone(3);
+                    }
+                }
+                pause(3);
+            }
+        }
+    }
+    pause(7);
+    pcm->flush();
+}
+
 int main(int argc, char *argv[])
 {
+    int a = 1;
+    while (a < argc && argv[a][0] == '-') {
+        switch (argv[a][1]) {
+        case 'c':
+            if (argv[a][2]) {
+                WPM_chars = atoi(argv[a]+2);
+            } else {
+                a++;
+                WPM_chars = atoi(argv[a]);
+            }
+            break;
+        case 'e':
+            Echo = true;
+            break;
+        case 'f':
+            if (argv[a][2]) {
+                Freq = atoi(argv[a]+2);
+            } else {
+                a++;
+                Freq = atoi(argv[a]);
+            }
+            break;
+        case 'v':
+            Verbose = true;
+            break;
+        case 'w':
+            if (argv[a][2]) {
+                WPM_total = atoi(argv[a]+2);
+            } else {
+                a++;
+                WPM_total = atoi(argv[a]);
+            }
+            break;
+        default:
+            fprintf(stderr, "%s: invalid option %s\n", argv[0], argv[a]);
+            exit(1);
+        }
+        a++;
+    }
+    if (WPM_chars == 0 || WPM_total == 0 || WPM_total > WPM_chars) {
+        fprintf(stderr, "%s: Invalid wpm parameter\n", argv[0]);
+        exit(1);
+    }
+    if (Verbose) {
+        fprintf(stderr, "%d WPM (%d WPM chars)\n", WPM_total, WPM_chars);
+    }
 #if defined(unix)
     pcm = new PcmOutputUnix("/dev/dsp");
 #elif defined(_WIN32)
@@ -294,29 +365,24 @@ int main(int argc, char *argv[])
     buf_silent = new short[SPC_total];
     memset(buf_silent, 0, SPC_total*sizeof(short));
     for (int i = 0; i < sizeof(buf_signal)/sizeof(short); i++) {
-        buf_signal[i] = static_cast<short>(12000*sin(FREQ*2*M_PI*i/sample_rate));
+        buf_signal[i] = static_cast<short>(12000*sin(Freq*2*M_PI*i/sample_rate));
     }
-    for (int a = 1; a < argc; a++) {
-        for (const char *p = argv[a]; *p != 0; p++) {
-            if (*p == ' ') {
-                pause(7);
-            } else {
-                const char *cw = getcode(toupper(*p));
-                if (cw != NULL) {
-                    for (const char *c = cw; *c != 0; c++) {
-                        if (*c == '.') {
-                            tone(1);
-                        } else {
-                            tone(3);
-                        }
-                    }
-                    pause(3);
-                }
+    if (a < argc) {
+        while (a < argc) {
+            morse(argv[a]);
+            if (Echo) {
+                printf("%s\n", argv[a]);
+            }
+            a++;
+        }
+    } else {
+        char buf[1024];
+        while (fgets(buf, sizeof(buf), stdin)) {
+            morse(buf);
+            if (Echo) {
+                fputs(buf, stdout);
             }
         }
-        pause(7);
-        pcm->flush();
-        printf("%s\n", argv[a]);
     }
     delete pcm;
     return 0;
