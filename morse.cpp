@@ -278,7 +278,19 @@ void pause(int w)
 
 void tone(int w)
 {
-    pcm->output(buf_signal, w*SPC_chars);
+    const int RAMP = 110;
+    short ramp[RAMP];
+    memcpy(ramp, buf_signal, sizeof(ramp));
+    for (int i = 0; i < RAMP; i++) {
+        ramp[i] = ramp[i]*i/RAMP;
+    }
+    pcm->output(ramp, RAMP);
+    pcm->output(buf_signal+RAMP, w*SPC_chars-2*RAMP);
+    memcpy(ramp, buf_signal+w*SPC_chars-RAMP, sizeof(ramp));
+    for (int i = 0; i < RAMP; i++) {
+        ramp[i] = ramp[i]*(RAMP-i-1)/RAMP;
+    }
+    pcm->output(ramp, RAMP);
     pcm->output(buf_silent, SPC_chars);
 }
 
