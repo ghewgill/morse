@@ -15,7 +15,9 @@ AC_PROG_AWK
 AC_CHECK_LIB([m], [sin])
 
 # Checks for header files.
-AC_CHECK_HEADER([sys/soundcard.h])
+AC_CHECK_HEADERS([sys/ioctl.h])
+AC_CHECK_HEADERS([sys/soundcard.h])
+AC_CHECK_HEADERS([unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 

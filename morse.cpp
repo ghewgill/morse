@@ -112,7 +112,7 @@ public:
     virtual ~PcmOutput() {}
     virtual int getSampleRate() = 0;
     virtual void output(const short *buf, int n) = 0;
-    virtual void flush() = 0;
+    virtual void flush() {}
 };
 
 #ifdef unix
@@ -128,9 +128,9 @@ private:
     int sample_rate;
 };
 
-PcmOutputUnix::PcmOutputUnix()
+PcmOutputUnix::PcmOutputUnix(const char *dev)
 {
-    fd = open("/dev/dsp", O_WRONLY);
+    fd = open(dev, O_WRONLY);
     if (fd < 0) {
         perror("open");
         exit(1);
