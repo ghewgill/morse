@@ -1,12 +1,33 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <ctype.h>
 #include <fcntl.h>
+#include <malloc.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_IOCTL_H
+#include <sys/ioctl.h>
+#endif
+
+#ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+#ifndef M_PI
+double M_PI = 4*atan(1);
+#endif
 
 const int WPM_chars = 10;
 const int WPM_total = 5;
@@ -86,22 +107,30 @@ const char *getcode(char c)
     return NULL;
 }
 
-void pause(int fd, int w)
-{
-    while (w--) {
-        write(fd, buf_silent, SPC_total*sizeof(short));
-    }
-}
+class PcmOutput {
+public:
+    virtual ~PcmOutput() {}
+    virtual int getSampleRate() = 0;
+    virtual void output(const short *buf, int n) = 0;
+    virtual void flush() = 0;
+};
 
-void tone(int fd, int w)
-{
-    write(fd, buf_signal, w*SPC_chars*sizeof(short));
-    write(fd, buf_silent, SPC_chars*sizeof(short));
-}
+#ifdef unix
 
-int main(int argc, char *argv[])
+class PcmOutputUnix: public PcmOutput {
+public:
+    PcmOutputUnix(const char *dev);
+    virtual ~PcmOutputUnix();
+    virtual int getSampleRate();
+    virtual void output(const short *buf, int n);
+private:
+    int fd;
+    int sample_rate;
+};
+
+PcmOutputUnix::PcmOutputUnix()
 {
-    int fd = open("/dev/dsp", O_WRONLY);
+    fd = open("/dev/dsp", O_WRONLY);
     if (fd < 0) {
         perror("open");
         exit(1);
@@ -124,7 +153,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "gen: Error, cannot set the channel number to 0\n");
         exit(1);
     }
-    int sample_rate = 22050;
+    sample_rate = 22050;
     sndparam = sample_rate;
     if (ioctl(fd, SNDCTL_DSP_SPEED, &sndparam) == -1) {
         perror("ioctl: SNDCTL_DSP_SPEED");
@@ -137,6 +166,129 @@ int main(int argc, char *argv[])
     if (sndparam != sample_rate) {
         fprintf(stderr, "Warning: Sampling rate is %u, requested %u\n", sndparam, sample_rate);
     }
+}
+
+PcmOutputUnix::~PcmOutputUnix()
+{
+    close(fd);
+}
+
+int PcmOutputUnix::getSampleRate()
+{
+    return sample_rate;
+}
+
+void PcmOutputUnix::output(const short *buf, int n)
+{
+    write(fd, buf, n*sizeof(short));
+}
+
+#endif // unix
+
+#ifdef _WIN32
+
+class PcmOutputWin32: public PcmOutput {
+public:
+    PcmOutputWin32();
+    virtual ~PcmOutputWin32();
+    virtual int getSampleRate() { return 22050; }
+    virtual void output(const short *buf, int n);
+    virtual void flush();
+private:
+    struct Header {
+        char tagRIFF[4];
+        unsigned long riffsize;
+        char tagWAVE[4];
+        char tagfmt[4];
+        unsigned long fmtsize;
+        unsigned short wFormatTag;
+        unsigned short nChannels;
+        unsigned long nSamplesPerSec;
+        unsigned long nAvgBytesPerSec;
+        unsigned short nBlockAlign;
+        unsigned short nBitsPerSample;
+        char tagdata[4];
+        unsigned long datasize;
+    };
+    Header *wav;
+    int data_size;
+    int alloc_size;
+};
+
+PcmOutputWin32::PcmOutputWin32()
+{
+    data_size = 0;
+    alloc_size = 65536;
+    wav = (Header *)malloc(sizeof(Header)+alloc_size);
+
+    strncpy(wav->tagRIFF, "RIFF", 4);
+    wav->riffsize = 0;
+    strncpy(wav->tagWAVE, "WAVE", 4);
+    strncpy(wav->tagfmt, "fmt ", 4);
+    wav->fmtsize = 16;
+    wav->wFormatTag = 1;
+    wav->nChannels = 1;
+    wav->nSamplesPerSec = 22050;
+    wav->nAvgBytesPerSec = 22050*16/8*1;
+    wav->nBlockAlign = 16/8;
+    wav->nBitsPerSample = 16;
+    strncpy(wav->tagdata, "data", 4);
+    wav->datasize = 0;
+}
+
+PcmOutputWin32::~PcmOutputWin32()
+{
+    flush();
+}
+
+void PcmOutputWin32::output(const short *buf, int n)
+{
+    while (data_size+n*sizeof(short) > alloc_size) {
+        alloc_size *= 2;
+        wav = (Header *)realloc(wav, sizeof(Header)+alloc_size);
+    }
+    memcpy((BYTE *)wav+sizeof(Header)+data_size, buf, n*sizeof(short));
+    data_size += n*sizeof(short);
+}
+
+void PcmOutputWin32::flush()
+{
+    if (data_size == 0) {
+        return;
+    }
+    wav->riffsize = 36+data_size;
+    wav->datasize = data_size;
+    PlaySound((const char *)wav, NULL, SND_MEMORY|SND_SYNC);
+    data_size = 0;
+}
+
+#endif // _WIN32
+
+PcmOutput *pcm;
+
+void pause(int w)
+{
+    while (w--) {
+        pcm->output(buf_silent, SPC_total);
+    }
+}
+
+void tone(int w)
+{
+    pcm->output(buf_signal, w*SPC_chars);
+    pcm->output(buf_silent, SPC_chars);
+}
+
+int main(int argc, char *argv[])
+{
+#if defined(unix)
+    pcm = new PcmOutputUnix("/dev/dsp");
+#elif defined(_WIN32)
+    pcm = new PcmOutputWin32();
+#else
+    #error unsupported platform
+#endif
+    int sample_rate = pcm->getSampleRate();
     SPC_chars = (sample_rate*60)/(WPM_chars*50);
     SPC_total = ((sample_rate*60)/WPM_total - SPC_chars*31) / 19;
     buf_silent = new short[SPC_total];
@@ -144,27 +296,28 @@ int main(int argc, char *argv[])
     for (int i = 0; i < sizeof(buf_signal)/sizeof(short); i++) {
         buf_signal[i] = static_cast<short>(12000*sin(FREQ*2*M_PI*i/sample_rate));
     }
-    for (int i = 1; i < argc; i++) {
-        for (const char *p = argv[i]; *p != 0; p++) {
+    for (int a = 1; a < argc; a++) {
+        for (const char *p = argv[a]; *p != 0; p++) {
             if (*p == ' ') {
-                pause(fd, 7);
+                pause(7);
             } else {
                 const char *cw = getcode(toupper(*p));
                 if (cw != NULL) {
                     for (const char *c = cw; *c != 0; c++) {
                         if (*c == '.') {
-                            tone(fd, 1);
+                            tone(1);
                         } else {
-                            tone(fd, 3);
+                            tone(3);
                         }
                     }
-                    pause(fd, 3);
+                    pause(3);
                 }
             }
         }
-        pause(fd, 7);
-        printf("%s\n", argv[i]);
+        pause(7);
+        pcm->flush();
+        printf("%s\n", argv[a]);
     }
-    close(fd);
+    delete pcm;
     return 0;
 }

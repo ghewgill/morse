@@ -1,0 +1,2 @@
+morse.exe: morse.cpp
+	cl morse.cpp winmm.lib
