@@ -9,8 +9,16 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>
+#endif
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_WAIT_H
+#include <sys/wait.h>
 #endif
 
 #ifdef _WIN32
@@ -20,20 +28,97 @@
 #define for if(0);else for
 #endif
 
+#ifdef _WIN32
+#define BIN_MORSE "morse.exe"
+#else
+#define BIN_MORSE "./morse"
+#endif
+
 const char Letters[] = "KMRSUAPTLOWI.NJEF0Y,VG5/Q9ZH38B?427C1D6X<BT><SK><AR>";
 const int WMAX = 10;
 
+int WPM = 15;
 int Level = 2;
-
-struct {
-    int total;
-    int correct;
-} History[5];
-int HistoryCount = 0;
 
 double urand()
 {
     return (double)rand() / RAND_MAX;
+}
+
+class Morse {
+public:
+    Morse(const char *text);
+    ~Morse();
+    void stop();
+private:
+#ifdef _WIN32
+    HANDLE process;
+#else
+    pid_t process;
+#endif
+};
+
+Morse::Morse(const char *text)
+{
+#ifdef _WIN32
+    char cmd[1000];
+    snprintf(cmd, sizeof(cmd), BIN_MORSE" -c20 -w15 %d", text);
+    printf("TODO: exec %s\n", cmd);
+    //CreateProcess
+#else
+    process = fork();
+    if (process == 0) {
+        execl(BIN_MORSE, BIN_MORSE, "-c20", "-w15", text, NULL);
+        exit(127);
+    }
+#endif
+}
+
+Morse::~Morse()
+{
+    stop();
+#ifdef _WIN32
+    CloseHandle(process);
+#else
+    int status;
+    waitpid(process, &status, 0);
+#endif
+}
+
+void Morse::stop()
+{
+#ifdef _WIN32
+    TerminateProcess(process, 0);
+#else
+    kill(process, SIGTERM);
+#endif
+}
+
+int match(const char *good, const char *test)
+{
+    int n = 0;
+    int t = 0;
+    while (*good != 0) {
+        if (isspace(*good)) {
+            while (*test != 0 && !isspace(*test)) {
+                test++;
+            }
+            if (isspace(*test)) {
+                test++;
+            }
+        } else {
+            if (toupper(*good) == toupper(*test)) {
+                t++;
+            }
+            if (*test != 0 && !isspace(*test)) {
+                test++;
+            }
+            n++;
+        }
+        good++;
+    }
+    printf("n=%d, t=%d\n", n, t);
+    return 100*t/n;
 }
 
 int main(int argc, char *argv[])
@@ -42,60 +127,30 @@ int main(int argc, char *argv[])
         Level = atoi(argv[1]);
     }
     srand(time(0));
-    int lastminute = 0;
-    int total = 0;
-    int correct = 0;
     for (;;) {
-        sleep(1);
-        int len = static_cast<int>(urand()*5+2); //5*(1/-log(urand()));
-        char buf[WMAX];
-        for (int i = 0; i < len; i++) {
-            buf[i] = Letters[static_cast<int>(urand()*Level)];
+        char words[1000];
+        words[0] = 0;
+        for (int i = 0; i < WPM*5; i++) {
+            int len = static_cast<int>(urand()*5+2); //5*(1/-log(urand()));
+            char word[WMAX];
+            for (int j = 0; j < len; j++) {
+                word[j] = Letters[static_cast<int>(urand()*Level)];
+            }
+            word[len] = 0;
+            strcat(words, word);
+            strcat(words, " ");
         }
-        buf[len] = 0;
-        char cmd[200];
-        snprintf(cmd, sizeof(cmd), "morse -c20 -w15 %s", buf);
-        system(cmd);
-        char user[WMAX];
-        memset(user, 0, sizeof(user));
+        printf("words: %s\n", words);
+        sleep(1);
+        Morse morse(words);
+        char user[1000];
         if (fgets(user, sizeof(user), stdin) == NULL) {
             break;
         }
-        if (user[0] == '\n') {
-            continue;
-        } else if (user[0] == '*') {
-            printf("(reset)\n");
-            total = 0;
-            correct = 0;
-            continue;
-        } else if (user[0] == '+') {
+        int score = match(words, user);
+        printf("%d%%\n", score);
+        if (score >= 90) {
             Level++;
-            printf("Level %d\n", Level);
-            continue;
-        }
-        //printf("%s\n", buf);
-        for (int i = 0; i < len; i++) {
-            if (toupper(user[i]) == buf[i]) {
-                correct++;
-            }
-            total++;
-        }
-        int minute = time(0) / 60;
-        if (minute != lastminute) {
-            memcpy(History+1, History, sizeof(History)-sizeof(History[0]));
-            History[0].total = total;
-            History[0].correct = correct;
-            if (HistoryCount < sizeof(History)/sizeof(History[0])) {
-                HistoryCount++;
-            }
-            int t = 0;
-            int c = 0;
-            for (int i = 0; i < HistoryCount; i++) {
-                t += History[i].total;
-                c += History[i].correct;
-            }
-            printf("%d%%\n", 100*c/t);
-            lastminute = minute;
         }
     }
     return 0;
