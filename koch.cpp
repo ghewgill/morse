@@ -62,15 +62,24 @@ Morse::Morse(const char *text)
 {
 #ifdef _WIN32
     char cmd[1000];
-    snprintf(cmd, sizeof(cmd), BIN_MORSE" -c20 -w%d %d", WPM, text);
-    printf("TODO: exec %s\n", cmd);
-    //CreateProcess
+    snprintf(cmd, sizeof(cmd), BIN_MORSE" -c20 -w%d %s", WPM, text);
+    STARTUPINFO si;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi;
+    if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        fprintf(stderr, "CreateProcess failed: %d\n", GetLastError());
+        return;
+    }
+    CloseHandle(pi.hThread);
+    process = pi.hProcess;
 #else
     process = fork();
     if (process == 0) {
         char wpm[10];
         snprintf(wpm, sizeof(wpm), "-w%d\n", WPM);
         execl(BIN_MORSE, BIN_MORSE, "-c20", wpm, text, NULL);
+        fprintf(stderr, "execl failed: %d\n", errno);
         exit(127);
     }
 #endif
