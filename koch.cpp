@@ -37,7 +37,7 @@
 const char Letters[] = "KMRSUAPTLOWI.NJEF0Y,VG5/Q9ZH38B?427C1D6X<BT><SK><AR>";
 const int WMAX = 10;
 
-int WPM = 15;
+int WPM = 10;
 int Level = 2;
 
 double urand()
@@ -62,13 +62,15 @@ Morse::Morse(const char *text)
 {
 #ifdef _WIN32
     char cmd[1000];
-    snprintf(cmd, sizeof(cmd), BIN_MORSE" -c20 -w15 %d", text);
+    snprintf(cmd, sizeof(cmd), BIN_MORSE" -c20 -w%d %d", WPM, text);
     printf("TODO: exec %s\n", cmd);
     //CreateProcess
 #else
     process = fork();
     if (process == 0) {
-        execl(BIN_MORSE, BIN_MORSE, "-c20", "-w15", text, NULL);
+        char wpm[10];
+        snprintf(wpm, sizeof(wpm), "-w%d\n", WPM);
+        execl(BIN_MORSE, BIN_MORSE, "-c20", wpm, text, NULL);
         exit(127);
     }
 #endif
@@ -117,7 +119,6 @@ int match(const char *good, const char *test)
         }
         good++;
     }
-    printf("n=%d, t=%d\n", n, t);
     return 100*t/n;
 }
 
@@ -128,6 +129,11 @@ int main(int argc, char *argv[])
     }
     srand(time(0));
     for (;;) {
+        printf("Letters: %.*s\n", Level, Letters);
+        printf("(press Enter to start)\n");
+        if (getchar() == EOF) {
+            break;
+        }
         char words[1000];
         words[0] = 0;
         for (int i = 0; i < WPM*5; i++) {
@@ -140,7 +146,7 @@ int main(int argc, char *argv[])
             strcat(words, word);
             strcat(words, " ");
         }
-        printf("words: %s\n", words);
+        //printf("words: %s\n", words);
         sleep(1);
         Morse morse(words);
         char user[1000];
