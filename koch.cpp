@@ -39,7 +39,7 @@ const char Letters[] = "KMRSUAPTLOWI.NJEF0Y,VG5/Q9ZH38B?427C1D6X<BT><SK><AR>";
 const int WMAX = 10;
 
 int WPM_chars = 20;
-int WPM_total = 15;
+int WPM_total = 10;
 int Level = 2;
 
 double urand()
@@ -113,7 +113,7 @@ int match(const char *good, const char *test)
 {
     int n = 0;
     int t = 0;
-    while (*good != 0) {
+    while (*good != 0 && *test != 0) {
         if (isspace(*good)) {
             while (*test != 0 && !isspace(*test)) {
                 test++;
@@ -202,6 +202,8 @@ int main(int argc, char *argv[])
         printf("%d%%\n", score);
         if (score >= 90) {
             Level++;
+        } else if (score < 50 && Level > 2) {
+            Level--;
         }
     }
     return 0;
