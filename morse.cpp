@@ -31,7 +31,7 @@
 double M_PI = 4*atan(1);
 #endif
 
-int WPM_chars = 5;
+int WPM_chars = 18;
 int WPM_total = 5;
 int Freq = 750;
 bool Verbose = false;

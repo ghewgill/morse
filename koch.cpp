@@ -162,8 +162,8 @@ int main(int argc, char *argv[])
         }
         a++;
     }
-    if (WPM_chars < WPM_total) {
-        WPM_total = WPM_chars;
+    if (WPM_total > WPM_chars) {
+        WPM_chars = WPM_total;
     }
     if (a < argc) {
         Level = atoi(argv[a]);
