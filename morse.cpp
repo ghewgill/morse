@@ -32,7 +32,7 @@ double M_PI = 4*atan(1);
 
 int WPM_chars = 5;
 int WPM_total = 5;
-int Freq = 500;
+int Freq = 750;
 bool Verbose = false;
 bool Echo = false;
 
@@ -366,7 +366,7 @@ int main(int argc, char *argv[])
     buf_silent = new short[SPC_total];
     memset(buf_silent, 0, SPC_total*sizeof(short));
     for (int i = 0; i < sizeof(buf_signal)/sizeof(short); i++) {
-        buf_signal[i] = static_cast<short>(12000*sin(Freq*2*M_PI*i/sample_rate));
+        buf_signal[i] = static_cast<short>(16000*sin(Freq*2*M_PI*i/sample_rate));
     }
     if (a < argc) {
         while (a < argc) {
