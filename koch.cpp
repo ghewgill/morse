@@ -1,8 +1,17 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -37,7 +46,7 @@ int main(int argc, char *argv[])
     int correct = 0;
     for (;;) {
         sleep(1);
-        int len = urand()*5+2; //5*(1/-log(urand()));
+        int len = static_cast<int>(urand()*5+2); //5*(1/-log(urand()));
         char buf[WMAX];
         for (int i = 0; i < len; i++) {
             buf[i] = Letters[static_cast<int>(urand()*Level)];
