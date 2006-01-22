@@ -1,25 +1,14 @@
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <malloc.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
+#ifndef _WIN32
 #include <unistd.h>
-#endif
-
-#ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
-#endif
-
-#ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
 #endif
 

@@ -1,7 +1,3 @@
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #include <ctype.h>
 #include <errno.h>
 #include <math.h>
@@ -10,15 +6,9 @@
 #include <string.h>
 #include <time.h>
 
-#ifdef HAVE_SIGNAL_H
+#ifndef _WIN32
 #include <signal.h>
-#endif
-
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
-
-#ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
 
