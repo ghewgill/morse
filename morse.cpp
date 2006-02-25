@@ -26,6 +26,7 @@ int WPM_total = 5;
 int Freq = 750;
 bool Verbose = false;
 bool Echo = false;
+const char *OutputFile = NULL;
 
 int SPC_chars;
 int SPC_total;
@@ -180,12 +181,10 @@ void PcmOutputUnix::output(const short *buf, int n)
 
 #endif // unix
 
-#ifdef _WIN32
-
-class PcmOutputWin32Wav: public PcmOutput {
+class PcmOutputWav: public PcmOutput {
 public:
-    PcmOutputWin32Wav();
-    virtual ~PcmOutputWin32Wav();
+    PcmOutputWav(const char *fn);
+    virtual ~PcmOutputWav();
     virtual int getSampleRate() { return 22050; }
     virtual void output(const short *buf, int n);
     virtual void flush();
@@ -205,57 +204,59 @@ private:
         char tagdata[4];
         unsigned long datasize;
     };
-    Header *wav;
+    Header header;
     int data_size;
-    int alloc_size;
+    FILE *f;
 };
 
-PcmOutputWin32Wav::PcmOutputWin32Wav()
+PcmOutputWav::PcmOutputWav(const char *fn)
 {
     data_size = 0;
-    alloc_size = 65536;
-    wav = (Header *)malloc(sizeof(Header)+alloc_size);
 
-    strncpy(wav->tagRIFF, "RIFF", 4);
-    wav->riffsize = 0;
-    strncpy(wav->tagWAVE, "WAVE", 4);
-    strncpy(wav->tagfmt, "fmt ", 4);
-    wav->fmtsize = 16;
-    wav->wFormatTag = 1;
-    wav->nChannels = 1;
-    wav->nSamplesPerSec = 22050;
-    wav->nAvgBytesPerSec = 22050*16/8*1;
-    wav->nBlockAlign = 16/8;
-    wav->nBitsPerSample = 16;
-    strncpy(wav->tagdata, "data", 4);
-    wav->datasize = 0;
+    strncpy(header.tagRIFF, "RIFF", 4);
+    header.riffsize = 0;
+    strncpy(header.tagWAVE, "WAVE", 4);
+    strncpy(header.tagfmt, "fmt ", 4);
+    header.fmtsize = 16;
+    header.wFormatTag = 1;
+    header.nChannels = 1;
+    header.nSamplesPerSec = 22050;
+    header.nAvgBytesPerSec = 22050*16/8*1;
+    header.nBlockAlign = 16/8;
+    header.nBitsPerSample = 16;
+    strncpy(header.tagdata, "data", 4);
+    header.datasize = 0;
+
+    f = fopen(fn, "wb");
+    if (f == NULL) {
+        perror("fopen");
+        exit(1);
+    }
+    fwrite(&header, 1, sizeof(header), f);
 }
 
-PcmOutputWin32Wav::~PcmOutputWin32Wav()
+PcmOutputWav::~PcmOutputWav()
 {
     flush();
+    fclose(f);
 }
 
-void PcmOutputWin32Wav::output(const short *buf, int n)
+void PcmOutputWav::output(const short *buf, int n)
 {
-    while (data_size+n*sizeof(short) > alloc_size) {
-        alloc_size *= 2;
-        wav = (Header *)realloc(wav, sizeof(Header)+alloc_size);
-    }
-    memcpy((BYTE *)wav+sizeof(Header)+data_size, buf, n*sizeof(short));
+    fwrite(buf, sizeof(short), n, f);
     data_size += n*sizeof(short);
 }
 
-void PcmOutputWin32Wav::flush()
+void PcmOutputWav::flush()
 {
-    if (data_size == 0) {
-        return;
-    }
-    wav->riffsize = 36+data_size;
-    wav->datasize = data_size;
-    PlaySound((const char *)wav, NULL, SND_MEMORY|SND_SYNC);
-    data_size = 0;
+    header.riffsize = 36+data_size;
+    header.datasize = data_size;
+    fseek(f, 0, SEEK_SET);
+    fwrite(&header, 1, sizeof(header), f);
+    fseek(f, 0, SEEK_END);
 }
+
+#ifdef _WIN32
 
 class PcmOutputWin32: public PcmOutput {
 public:
@@ -465,6 +466,14 @@ int main(int argc, char *argv[])
                 Freq = atoi(argv[a]);
             }
             break;
+        case 'o':
+            if (argv[a][2]) {
+                OutputFile = &argv[a][2];
+            } else {
+                a++;
+                OutputFile = argv[a];
+            }
+            break;
         case 'v':
             Verbose = true;
             break;
@@ -492,13 +501,17 @@ int main(int argc, char *argv[])
     if (Verbose) {
         fprintf(stderr, "%d WPM (%d WPM chars)\n", WPM_total, WPM_chars);
     }
+    if (OutputFile) {
+        pcm = new PcmOutputWav(OutputFile);
+    } else {
 #if defined(unix)
-    pcm = new PcmOutputUnix("/dev/dsp");
+        pcm = new PcmOutputUnix("/dev/dsp");
 #elif defined(_WIN32)
-    pcm = new PcmOutputWin32();
+        pcm = new PcmOutputWin32();
 #else
-    #error unsupported platform
+        #error unsupported platform
 #endif
+    }
     int sample_rate = pcm->getSampleRate();
     SPC_chars = (sample_rate*60)/(WPM_chars*50);
     SPC_total = ((sample_rate*60)/WPM_total - SPC_chars*31) / 19;
