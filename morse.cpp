@@ -18,7 +18,7 @@
 #endif
 
 #ifndef M_PI
-double M_PI = 4*atan(1);
+double M_PI = 4*atan(1.0);
 #endif
 
 int WPM_chars = 18;
