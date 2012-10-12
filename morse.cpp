@@ -9,6 +9,9 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/ioctl.h>
+#endif
+
+#ifdef unix
 #include <sys/soundcard.h>
 #endif
 
@@ -33,7 +36,7 @@ int SPC_total;
 short *buf_silent;
 short buf_signal[20000];
 
-struct {
+struct cw {
     char c;
     char code[8];
 } CW[] = {
